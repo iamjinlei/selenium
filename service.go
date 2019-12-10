@@ -23,17 +23,17 @@ type ServiceOption func(*Service) error
 // write to that X server.
 func Display(d, xauthPath string) ServiceOption {
 	return func(s *Service) error {
-		if s.display != "" {
-			return fmt.Errorf("service display already set: %v", s.display)
+		if s.Display != "" {
+			return fmt.Errorf("service display already set: %v", s.Display)
 		}
-		if s.xauthPath != "" {
-			return fmt.Errorf("service xauth path already set: %v", s.xauthPath)
+		if s.XauthPath != "" {
+			return fmt.Errorf("service xauth path already set: %v", s.XauthPath)
 		}
 		if !isDisplay(d) {
 			return fmt.Errorf("supplied display %q must be of the format 'x' or 'x.y' where x and y are integers", d)
 		}
-		s.display = d
-		s.xauthPath = xauthPath
+		s.Display = d
+		s.XauthPath = xauthPath
 		return nil
 	}
 }
@@ -76,20 +76,20 @@ type FrameBufferOptions struct {
 // service itself is stopped.
 func StartFrameBufferWithOptions(options FrameBufferOptions) ServiceOption {
 	return func(s *Service) error {
-		if s.display != "" {
-			return fmt.Errorf("service display already set: %v", s.display)
+		if s.Display != "" {
+			return fmt.Errorf("service display already set: %v", s.Display)
 		}
-		if s.xauthPath != "" {
-			return fmt.Errorf("service xauth path already set: %v", s.xauthPath)
+		if s.XauthPath != "" {
+			return fmt.Errorf("service xauth path already set: %v", s.XauthPath)
 		}
-		if s.xvfb != nil {
+		if s.Xvfb != nil {
 			return fmt.Errorf("service Xvfb instance already running")
 		}
 		fb, err := NewFrameBufferWithOptions(options)
 		if err != nil {
 			return fmt.Errorf("error starting frame buffer: %v", err)
 		}
-		s.xvfb = fb
+		s.Xvfb = fb
 		return Display(fb.Display, fb.AuthPath)(s)
 	}
 }
@@ -118,7 +118,7 @@ func GeckoDriver(path string) ServiceOption {
 // ServiceOption is only useful when calling NewSeleniumService.
 func ChromeDriver(path string) ServiceOption {
 	return func(s *Service) error {
-		s.chromeDriverPath = path
+		s.ChromeDriverPath = path
 		return nil
 	}
 }
@@ -144,16 +144,16 @@ func HTMLUnit(path string) ServiceOption {
 
 // Service controls a locally-running Selenium subprocess.
 type Service struct {
-	port            int
-	addr            string
-	cmd             *exec.Cmd
-	shutdownURLPath string
+	Port            int
+	Addr            string
+	Cmd             *exec.Cmd
+	ShutdownURLPath string
 
-	display, xauthPath string
-	xvfb               *FrameBuffer
+	Display, XauthPath string
+	Xvfb               *FrameBuffer
 
 	geckoDriverPath, javaPath string
-	chromeDriverPath          string
+	ChromeDriverPath          string
 	htmlUnitPath              string
 
 	output io.Writer
@@ -161,7 +161,7 @@ type Service struct {
 
 // FrameBuffer returns the FrameBuffer if one was started by the service and nil otherwise.
 func (s Service) FrameBuffer() *FrameBuffer {
-	return s.xvfb
+	return s.Xvfb
 }
 
 // NewSeleniumService starts a Selenium instance in the background.
@@ -171,13 +171,13 @@ func NewSeleniumService(jarPath string, port int, opts ...ServiceOption) (*Servi
 		return nil, err
 	}
 	if s.javaPath != "" {
-		s.cmd.Path = s.javaPath
+		s.Cmd.Path = s.javaPath
 	}
 	if s.geckoDriverPath != "" {
-		s.cmd.Args = append([]string{"java", "-Dwebdriver.gecko.driver=" + s.geckoDriverPath}, s.cmd.Args[1:]...)
+		s.Cmd.Args = append([]string{"java", "-Dwebdriver.gecko.driver=" + s.geckoDriverPath}, s.Cmd.Args[1:]...)
 	}
-	if s.chromeDriverPath != "" {
-		s.cmd.Args = append([]string{"java", "-Dwebdriver.chrome.driver=" + s.chromeDriverPath}, s.cmd.Args[1:]...)
+	if s.ChromeDriverPath != "" {
+		s.Cmd.Args = append([]string{"java", "-Dwebdriver.chrome.driver=" + s.ChromeDriverPath}, s.Cmd.Args[1:]...)
 	}
 
 	var classpath []string
@@ -185,8 +185,8 @@ func NewSeleniumService(jarPath string, port int, opts ...ServiceOption) (*Servi
 		classpath = append(classpath, s.htmlUnitPath)
 	}
 	classpath = append(classpath, jarPath)
-	s.cmd.Args = append(s.cmd.Args, "-cp", strings.Join(classpath, ":"))
-	s.cmd.Args = append(s.cmd.Args, "org.openqa.grid.selenium.GridLauncherV3", "-port", strconv.Itoa(port), "-debug")
+	s.Cmd.Args = append(s.Cmd.Args, "-cp", strings.Join(classpath, ":"))
+	s.Cmd.Args = append(s.Cmd.Args, "org.openqa.grid.selenium.GridLauncherV3", "-port", strconv.Itoa(port), "-debug")
 
 	if err := s.start(port); err != nil {
 		return nil, err
@@ -201,7 +201,7 @@ func NewChromeDriverService(path string, port int, opts ...ServiceOption) (*Serv
 	if err != nil {
 		return nil, err
 	}
-	s.shutdownURLPath = "/shutdown"
+	s.ShutdownURLPath = "/shutdown"
 	if err := s.start(port); err != nil {
 		return nil, err
 	}
@@ -223,8 +223,8 @@ func NewGeckoDriverService(path string, port int, opts ...ServiceOption) (*Servi
 
 func newService(cmd *exec.Cmd, urlPrefix string, port int, opts ...ServiceOption) (*Service, error) {
 	s := &Service{
-		port: port,
-		addr: fmt.Sprintf("http://localhost:%d%s", port, urlPrefix),
+		Port: port,
+		Addr: fmt.Sprintf("http://localhost:%d%s", port, urlPrefix),
 	}
 	for _, opt := range opts {
 		if err := opt(s); err != nil {
@@ -236,24 +236,24 @@ func newService(cmd *exec.Cmd, urlPrefix string, port int, opts ...ServiceOption
 	cmd.Env = os.Environ()
 	// TODO(minusnine): Pdeathsig is only supported on Linux. Somehow, make sure
 	// process cleanup happens as gracefully as possible.
-	if s.display != "" {
-		cmd.Env = append(cmd.Env, "DISPLAY=:"+s.display)
+	if s.Display != "" {
+		cmd.Env = append(cmd.Env, "DISPLAY=:"+s.Display)
 	}
-	if s.xauthPath != "" {
-		cmd.Env = append(cmd.Env, "XAUTHORITY="+s.xauthPath)
+	if s.XauthPath != "" {
+		cmd.Env = append(cmd.Env, "XAUTHORITY="+s.XauthPath)
 	}
-	s.cmd = cmd
+	s.Cmd = cmd
 	return s, nil
 }
 
 func (s *Service) start(port int) error {
-	if err := s.cmd.Start(); err != nil {
+	if err := s.Cmd.Start(); err != nil {
 		return err
 	}
 
 	for i := 0; i < 30; i++ {
 		time.Sleep(time.Second)
-		resp, err := http.Get(s.addr + "/status")
+		resp, err := http.Get(s.Addr + "/status")
 		if err == nil {
 			resp.Body.Close()
 			switch resp.StatusCode {
@@ -272,22 +272,22 @@ func (s *Service) start(port int) error {
 func (s *Service) Stop() error {
 	// Selenium 3 stopped supporting the shutdown URL by default.
 	// https://github.com/SeleniumHQ/selenium/issues/2852
-	if s.shutdownURLPath == "" {
-		if err := s.cmd.Process.Kill(); err != nil {
+	if s.ShutdownURLPath == "" {
+		if err := s.Cmd.Process.Kill(); err != nil {
 			return err
 		}
 	} else {
-		resp, err := http.Get(s.addr + s.shutdownURLPath)
+		resp, err := http.Get(s.Addr + s.ShutdownURLPath)
 		if err != nil {
 			return err
 		}
 		resp.Body.Close()
 	}
-	if err := s.cmd.Wait(); err != nil && err.Error() != "signal: killed" {
+	if err := s.Cmd.Wait(); err != nil && err.Error() != "signal: killed" {
 		return err
 	}
-	if s.xvfb != nil {
-		return s.xvfb.Stop()
+	if s.Xvfb != nil {
+		return s.Xvfb.Stop()
 	}
 	return nil
 }
